@@ -75,7 +75,7 @@ load(paste0(dirtemp, "sccs_sensitivity/", "sccs_data_extract", ".RData"))
   if(nrow(sccs_analytical_file) <= 0) {
     message(paste0("There are NO observations in input data using ", design, " EMPTY OUTPUT CREATED")) 
   } 
-  
+
   table2.interim <- lapply(split(sccs_analytical_file, sccs_analytical_file$type_vax1), sccs_table)
   table2 <- do.call(rbind, table2.interim )
   

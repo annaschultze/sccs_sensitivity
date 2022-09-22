@@ -43,11 +43,6 @@ invisible(lapply(key_vars, function(x) if (!(x %in% colnames(scri_data_extract))
   stop(paste(x," does not exist"))
 }))
 
-# check the vaccine, entry and exit date are not character
-invisible(lapply(scri_data_extract[key_vars], function(x) if (is.character(x)) {
-  stop(paste(x,"is character, not date or numeric, and will not be converted by this program"))
-}))
-
 # Harmonise variable names; remove underscores
 oldnames <- c(names(scri_data_extract[grepl("vax", names(scri_data_extract))]),
               names(scri_data_extract[grepl("covid", names(scri_data_extract))]))
@@ -60,15 +55,24 @@ date_vars <- colnames(scri_data_extract)[grepl("date", colnames(scri_data_extrac
 date_vars <- date_vars[date_vars != "start_study_date"]
 date_vars_days <- gsub("date","days",date_vars)
 
-# Anna: This is the BIFAP data management option, I moved this up and rewrote to a (conditional) lapply 
-# it should be all the date vars as defined by you above, doesn't seem like it applies to start_study_date?
+# convert numeric to date (dates may be numeric in BIFAP)
 scri_data_extract[date_vars] <- lapply(scri_data_extract[date_vars],
                                        function(x) if (is.numeric(x)) as.Date(x, origin="1970-01-01") else x)
 
-# warning to double check that formats are as expected for one of the date variables
-if(is.numeric(scri_data_extract$study_exit_date)) {
-  warning("Expected date, but variable is numeric. Check conversion code")
-}
+# check for characters 
+invisible(lapply(colnames(scri_data_extract[date_vars]), function(x) {
+  if (is.character(scri_data_extract[[x]])) {
+    print(paste(x, "is character, check the format for converting dates as program assumes YYYY-MM-DD"))
+  }
+}))
+
+# convert character to date (assumed format YYYY-MM-DD)
+scri_data_extract[date_vars] <- lapply(scri_data_extract[date_vars],
+                                       function(x) if (is.character(x)) as.Date(x) else x)
+
+# double check that formats are as expected 
+print("check the formats of key variables")
+lapply(scri_data_extract[date_vars], function(x) class(x))
 
 # create a variable for study start date 
 # only relevant where someone enters late, not applicable to this study
@@ -132,6 +136,12 @@ if(nvax > 2){
       scri_data_extract[cond, paste0("vax"     ,iv-1) ] <- scri_data_extract[cond, paste0("vax"     ,iv) ]
     } 
   }  
+}
+
+# check if second dose different from first and if yes, censor these people at second dose 
+if(any(cond <- (scri_data_extract$type_vax1 != scri_data_extract$type_vax2) & !is.na(scri_data_extract$date_vax1) & !is.na(scri_data_extract$date_vax2))){
+  warning(paste0("There are ",sum( cond, na.rm=T)," persons with different dose 2 to dose 1, they are deleted!"))
+  scri_data_extract <- scri_data_extract[!((scri_data_extract$type_vax1 != scri_data_extract$type_vax2) & !is.na(scri_data_extract$date_vax1) & !is.na(scri_data_extract$date_vax2)),] 
 }
 
 # update the summary of time between doses after the above cleaning
