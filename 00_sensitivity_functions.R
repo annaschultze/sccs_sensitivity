@@ -123,21 +123,23 @@ sccs_data_management <- function(data,
   
   # DATA MANAGEMENT FOR CREATING RISK AND CONTROL TIME VARIABLES  
 
-  # pre-exposure period start and duration 
+  # pre-exposure period start, end and duration 
   data$preexp_days <- data$days_vax1 + preexp_per_start
-  data$preexp_dur <- (data$days_vax1 - data$preexp_days)
+  data$preexp_dur <- data$days_vax1 - data$preexp_days
+  data$preexp_end <- data$days_vax1
   
   # first risk window start, end and duration
   data$risk_d1 <- as.numeric(data$days_vax1 + 1)
-  data$riskend_d1 <- pmin((data$days_vax1 + vax1_end), data$study_exit_days, data$days_vax2, na.rm = T)
-  data$risk_d1_length <- (data$riskend_d1 - data$days_vax1)
+  data$risk_d1_end <- pmin((data$days_vax1 + vax1_end), data$study_exit_days, data$days_vax2, na.rm = T)
+  data$risk_d1_length <- (data$risk_d1_end - data$days_vax1)
+  
   # start of between period needs to be dose 1 + risk window + 1 (as last day should go to the risk window)
   data$risk_between <- data$risk_d1_length + 1 
   
   # second risk window start, end and duration
   data$risk_d2 <- as.numeric(data$days_vax2 + 1)
-  data$riskend_d2 <- pmin((data$days_vax2 + vax2_end), data$study_exit_days, na.rm = T)
-  data$risk_d2_length <- (data$riskend_d2 - data$days_vax2)
+  data$risk_d2_end <- pmin((data$days_vax2 + vax2_end), data$study_exit_days, na.rm = T)
+  data$risk_d2_length <- (data$risk_d2_end - data$days_vax2)
 
   ## create a numeric ID variable 
   data$numeric_id <- match(data$person_id, unique(data$person_id))
@@ -165,7 +167,7 @@ sccs_data_management <- function(data,
     
     # when should the time between doses end?
     # for sccs, end at the start (if zero, ignored in model estimation) 
-    data$between_end <- data$riskend_d1 + 1 
+    data$between_end <- data$risk_d1_end + 1 
     
   } else if(design == "scri") {
     
@@ -184,7 +186,7 @@ sccs_data_management <- function(data,
     data$ref_start <- as.numeric(data$ref_start)
     
     # end at the last of the end of the control window, first and second risk windows (whichever is first)
-    data$ref_end <- pmax(data$c_end, data$riskend_d1, data$riskend_d2,  na.rm = T)
+    data$ref_end <- pmax(data$c_end, data$risk_d1_end, data$risk_d2_end,  na.rm = T)
     data$ref_end <- as.numeric(data$ref_end)
     
     # time between doses should be taken out of the model 
@@ -439,8 +441,11 @@ sccs_table <- function(data) {
   n_total <- sum(as.numeric(!is.na(data$outcome_days) & (!is.na(data$days_vax1))))
   
   # number of events in risk windows 
-  n_risk1 <- sum(as.numeric((data$days_vax1 < data$outcome_days) & (data$outcome_days <= data$riskend_d1)), na.rm = T) 
-  n_risk2 <- sum(as.numeric((data$days_vax2 < data$outcome_days) & (data$outcome_days <= data$riskend_d2)), na.rm = T) 
+  n_risk1 <- sum(as.numeric((data$days_vax1 < data$outcome_days) & (data$outcome_days <= data$risk_d1_end)), na.rm = T) 
+  n_risk2 <- sum(as.numeric((data$days_vax2 < data$outcome_days) & (data$outcome_days <= data$risk_d2_end)), na.rm = T) 
+  
+  # number of events in pre-exposure period 
+  n_preexp <- sum(as.numeric((data$preexp_days < data$outcome_days) & (data$outcome_days <= data$preexp_end)), na.rm = T) 
   
   # number of events in "control" period 
  if("sccs" %in% data$study){
@@ -449,7 +454,7 @@ sccs_table <- function(data) {
     # double check how this handles missing second doses 
     n_control1 <- sum(as.numeric(data$outcome_days < data$preexp_days), na.rm = T) 
     n_control2 <- sum(as.numeric((data$riskend_d1 < data$outcome_days) & (data$outcome_days < data$between_dose_end)), na.rm = T) 
-    n_control3 <- sum(as.numeric((data$days_vax2 < data$outcome_days) & (data$outcome_days <=data$study_exit_days)), na.rm = T) 
+    n_control3 <- sum(as.numeric((data$riskend_d2 < data$outcome_days) & (data$outcome_days <= data$study_exit_days)), na.rm = T) 
     
     n_control <- sum(n_control1, n_control2, n_control3)
     
@@ -460,20 +465,22 @@ sccs_table <- function(data) {
   }
   
   # Duration
-  
   med_control <- as.numeric(median(data$control_length, na.rm = T))
   med_risk1 <- as.numeric(median(data$risk_d1_length, na.rm = T))
   med_risk2 <- as.numeric(median(data$risk_d2_length, na.rm = T))
+  med_preexp <- as.numeric(median(data$preexp_dur, na.rm = T))
   med_total <- as.numeric(median(data$study_length, na.rm = T))
   
   min_control <- as.numeric(min(data$control_length, na.rm = T))
   min_risk1 <- as.numeric(min(data$risk_d1_length, na.rm = T))
   min_risk2 <- as.numeric(min(data$risk_d2_length, na.rm = T))
+  min_preexp <- as.numeric(min(data$preexp_dur, na.rm = T))
   min_total <- as.numeric(min(data$study_length, na.rm = T))
   
   max_control <- as.numeric(max(data$control_length, na.rm = T))
   max_risk1 <- as.numeric(max(data$risk_d1_length, na.rm = T))
   max_risk2 <- as.numeric(max(data$risk_d2_length, na.rm = T))
+  max_preexp <- as.numeric(max(data$preexp_dur, na.rm = T))
   max_total <- as.numeric(max(data$study_length, na.rm = T))
   
   # Create Table 
@@ -492,12 +499,18 @@ sccs_table <- function(data) {
                     paste0(med_risk2, " (", min_risk2, " -", max_risk2, ")")
   )
   
+  
+  df_preexp <- cbind("pre-exp", 
+                    n_preexp, 
+                    paste0(med_preexp, " (", min_preexp, " -", max_preexp, ")")
+  )
+  
   df_total<- cbind("total", 
                    n_total, 
                    paste0(med_total, " (", min_total, " -", max_total, ")")
   )
   
-  df_all <- as.data.frame(rbind(df_control, df_risk1, df_risk2, df_total))
+  df_all <- as.data.frame(rbind(df_control, df_preexp, df_risk1, df_risk2, df_total))
   names(df_all) <- c("Time Period", "N Events", "Duration, Days (Q2, min - max")
   
   # print an update 
@@ -557,7 +570,7 @@ sccs_analysis <- function(data) {
   
   ## create a calendar time variable for calendar time adjustment (30-day interval between start and end)
   max_day = max(data$ref_end, na.rm = T)
-  month_cutoffs <- seq(from = 1, to = max_day-1, by = 30)
+  month_cutoffs <- seq(from = -1, to = max_day-1, by = 30)
   
   ## FIT SCCS OR SCRI 
   ### the sccs package does not take strings as input arguments
