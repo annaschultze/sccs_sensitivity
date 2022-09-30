@@ -116,6 +116,10 @@ sccs_data_management <- function(data,
     
   } else {
     
+    if (!outcome %in% names(data)) {
+      stop("outcome column does not exist, check spelling")
+    } 
+    
     data$outcome_date <- data[[outcome]]
     data$outcome_days <- round(difftime(data$outcome_date, as.Date("2020-09-01"), units = "days"),0)
     
@@ -363,53 +367,6 @@ sccs_flowchart <- function(data) {
   message("completed sccs_flowchart")
   
   return(df)
-  
-}   
-
-#' Apply SCCS/SCRI selection criteria 
-#' 
-#' @description
-#' Small function to apply the selection criteria per specified design. 
-#' Note, not type sensitive so will generate a dataset with all vaccine types (less NA). 
-#' 
-#' @param data = Input dataframe, should be loaded. 
-#' @returns Dataframe with inclusion/exclusion applied. 
-#' 
-
-sccs_selection <- function(data) {
-  
-  # print an update 
- message("starting sccs_selection")
-  
- if("sccs" %in% data$study){
-    
-    # apply selection
-    data <- data[data$cond_gender,  ]
-    data <- data[data$cond_age,  ]
-    data <- data[data$cond_vax1,  ]
-    data <- data[data$cond_type_vax1,  ]
-    data <- data[data$cond_outcome,  ]
-    data <- data[data$cond_outcome_from_sept2020,  ]
-    data <- data[data$cond_outcome_before_censor,  ]
-    
- } else if("scri" %in% data$study){
-    
-    # apply selection
-    data <- data[data$cond_gender,  ]
-    data <- data[data$cond_age,  ]
-    data <- data[data$cond_vax1,  ]
-    data <- data[data$cond_type_vax1,  ]
-    data <- data[data$cond_outcome,  ]
-    data <- data[data$cond_outcome_from_sept2020,  ]
-    data <- data[data$cond_outcome_before_censor,  ]
-    data <- data[data$cond_scri_events,  ]
-    
-  } 
-  
-  # print an update 
-  message("completed sccs_selection")
-  
-  return(data)
   
 }   
 
@@ -838,8 +795,7 @@ sccs_analysis <- function(data) {
       mutate(var = case_when(var == "risk_d11" ~ "pre-exposure pindow", 
                              var == "risk_d12" ~ "dose 1 risk window", 
                              var == "risk_d13" ~ "dose 2 risk window", 
-                             TRUE ~ var)) %>% 
-      slice_head(n = 3)
+                             TRUE ~ var)) 
   
   } else if("scri" %in% data$study) {
     
@@ -848,8 +804,7 @@ sccs_analysis <- function(data) {
                          var == "risk_d12" ~ "dose 1 risk window", 
                          var == "risk_d13" ~ "between doses", 
                          var == "risk_d14" ~ "dose 2 risk window", 
-                         TRUE ~ var)) %>% 
-    slice_head(n = 4)
+                         TRUE ~ var)) 
   
   } 
   

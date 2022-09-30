@@ -63,32 +63,21 @@ load(paste0(dirtemp, "sccs_sensitivity/", "sccs_data_extract", ".RData"))
   write.csv(table1.split, paste0(diroutput, "sccs_sensitivity/", design, "/table_1a.csv"), row.names = FALSE)
   write.csv(table1.all, paste0(diroutput, "sccs_sensitivity/", design, "/table_1b.csv"), row.names = FALSE)
   
-  # STEP 3. APPLY SELECTION 
-  # possibly doesn't need to be run because analysis will automatically drop ineligible cases 
-  # should be noted that retaining the entire population will affect age adjustment and table 1 summary stats (not all people will contribute to estimation)
+  # STEP 3. BASELINE TABLE 
 
-  sccs_analytical_file <- sccs_selection(data = scri_pre)
-
-  # STEP 4. BASELINE TABLE 
-  # note, if you haven't run the selection the totals in this table will not sum exactly 
-  
-  if(nrow(sccs_analytical_file) <= 0) {
-    message(paste0("There are NO observations in input data using ", design, " EMPTY OUTPUT CREATED")) 
-  } 
-
-  table2.interim <- lapply(split(sccs_analytical_file, sccs_analytical_file$type_vax1), sccs_table)
+  table2.interim <- lapply(split(scri_pre, scri_pre$type_vax1), sccs_table)
   table2 <- do.call(rbind, table2.interim )
-  
+
   table2 <- cbind(Names = rownames(table2), table2)
   table2$Names <- substring(table2$Names,1,nchar(table2$Names)-2)
 
   write.csv(table2, paste0(diroutput,"sccs_sensitivity/", design, "/table_2.csv"), row.names = FALSE)
 
-  # STEP 5. ANALYSIS 
+  # STEP 3. ANALYSIS 
   
-  table3.interim  <- lapply(split(sccs_analytical_file, sccs_analytical_file$type_vax1), sccs_analysis)
+  table3.interim  <- lapply(split(scri_pre, scri_pre$type_vax1), sccs_analysis)
   table3.split <- do.call(rbind,table3.interim)
-  
+
   table3.split <- cbind(Names = rownames(table3.split), table3.split)
   table3.split$Names <- substring(table3.split$Names,1,nchar(table3.split$Names)-2)
   
@@ -125,20 +114,9 @@ load(paste0(dirtemp, "sccs_sensitivity/", "sccs_data_extract", ".RData"))
   write.csv(table1.split, paste0(diroutput, "sccs_sensitivity/", design, "/table_1a.csv"), row.names = FALSE)
   write.csv(table1.all, paste0(diroutput, "sccs_sensitivity/", design, "/table_1b.csv"), row.names = FALSE)
   
-  # STEP 3. APPLY SELECTION 
-  # possibly doesn't need to be run because analysis will automatically drop ineligible cases 
-  # should be noted that retaining the entire population will affect age adjustment and table 1 summary stats (not all people will contribute to estimation)
+  # STEP 3. BASELINE TABLE 
 
-  sccs_analytical_file <- sccs_selection(data = scri_pre)
-  
-  # STEP 4. BASELINE TABLE 
-  # note, if you haven't run the selection the totals in this table will not sum exactly 
-  
-  if(nrow(sccs_analytical_file) <= 0) {
-    message(paste0("There are NO observations in input data using ", design, " EMPTY OUTPUT CREATED")) 
-  } 
-  
-  table2.interim <- lapply(split(sccs_analytical_file, sccs_analytical_file$type_vax1), sccs_table)
+  table2.interim <- lapply(split(scri_post, scri_post$type_vax1), sccs_table)
   table2 <- do.call(rbind, table2.interim )
   
   table2 <- cbind(Names = rownames(table2), table2)
@@ -146,9 +124,9 @@ load(paste0(dirtemp, "sccs_sensitivity/", "sccs_data_extract", ".RData"))
   
   write.csv(table2, paste0(diroutput,"sccs_sensitivity/", design, "/table_2.csv"), row.names = FALSE)
   
-  # STEP 5. ANALYSIS 
+  # STEP 4. ANALYSIS 
   
-  table3.interim  <- lapply(split(sccs_analytical_file, sccs_analytical_file$type_vax1), sccs_analysis)
+  table3.interim  <- lapply(split(scri_post, scri_post$type_vax1), sccs_analysis)
   table3.split <- do.call(rbind,table3.interim)
   
   table3.split <- cbind(Names = rownames(table3.split), table3.split)
@@ -184,20 +162,9 @@ load(paste0(dirtemp, "sccs_sensitivity/", "sccs_data_extract", ".RData"))
   write.csv(table1.split, paste0(diroutput, "sccs_sensitivity/", design, "/table_1a.csv"), row.names = FALSE)
   write.csv(table1.all, paste0(diroutput, "sccs_sensitivity/", design, "/table_1b.csv"), row.names = FALSE)
   
-  # STEP 3. APPLY SELECTION 
-  # possibly doesn't need to be run because analysis will automatically drop ineligible cases 
-  # should be noted that retaining the entire population will affect age adjustment and table 1 summary stats (not all people will contribute to estimation)
-
-  sccs_analytical_file <- sccs_selection(data = scri_pre)
-
-  # STEP 4. BASELINE TABLE 
-  # note, if you haven't run the selection the totals in this table will not sum exactly 
+  # STEP 3. BASELINE TABLE 
   
-  if(nrow(sccs_analytical_file) <= 0) {
-    message(paste0("There are NO observations in input data using ", design, " EMPTY OUTPUT CREATED")) 
-  } 
-  
-  table2.interim <- lapply(split(sccs_analytical_file, sccs_analytical_file$type_vax1), sccs_table)
+  table2.interim <- lapply(split(sccs, sccs$type_vax1), sccs_table)
   table2 <- do.call(rbind, table2.interim )
   
   table2 <- cbind(Names = rownames(table2), table2)
@@ -205,9 +172,9 @@ load(paste0(dirtemp, "sccs_sensitivity/", "sccs_data_extract", ".RData"))
   
   write.csv(table2, paste0(diroutput,"sccs_sensitivity/", design, "/table_2.csv"), row.names = FALSE)
   
-  # STEP 5. ANALYSIS 
+  # STEP 4. ANALYSIS 
   
-  table3.interim  <- lapply(split(sccs_analytical_file, sccs_analytical_file$type_vax1), sccs_analysis)
+  table3.interim  <- lapply(split(sccs, sccs$type_vax1), sccs_analysis)
   table3.split <- do.call(rbind,table3.interim)
   
   table3.split <- cbind(Names = rownames(table3.split), table3.split)
