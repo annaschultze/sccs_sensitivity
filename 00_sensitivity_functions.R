@@ -36,7 +36,7 @@ dir.create(file.path(paste0(diroutput, "sccs_sensitivity")),         showWarning
 #' @param outcome = Outcome variable name as a string, referencing a _date variable. 
 #' @param reduce_dimensions = T drop unnecessary rows to increase speed. Default is "F", option "T" .  
 #' @param design = Type of design - sccs or scri? Default "sccs", option "scri". 
-#' @param control_start = Date used to start the control period (days_vax1 or days_last_vax). 
+#' @param control_start = Date used to start the control period (days_vax1 or days_last_vax). Ignored for SCCS. 
 #' @param control_dur = Duration of the control period in days, NEGATIVE for prevaccine, POSITIVE for postvaccine. 
 #' @param preexp = Duration of the pre-exposure period, relative to first vaccine date. Default is zero (no pre-exposure period).
 #' @param risk1 = Day the risk period after the first vaccine dose ends, relative to the first vaccine date.
@@ -48,9 +48,9 @@ dir.create(file.path(paste0(diroutput, "sccs_sensitivity")),         showWarning
 sccs_data_management <- function(data, 
                                  outcome, 
                                  reduce_dimensions = "F", 
-                                 design = "sccs",
-                                 control_start = NULL, 
-                                 control_dur = NULL, 
+                                 design = "scri",
+                                 control_start = "days_vax1", 
+                                 control_dur = 60, 
                                  preexp = 0, 
                                  risk1, 
                                  risk2) {
@@ -124,6 +124,9 @@ sccs_data_management <- function(data,
     data$outcome_days <- round(difftime(data$outcome_date, as.Date("2020-09-01"), units = "days"),0)
     
   }
+  
+  # convert to numeric 
+  data$outcome_days <- as.numeric(data$outcome_days)
   
   # DATA MANAGEMENT FOR CREATING RISK AND CONTROL TIME VARIABLES  
 

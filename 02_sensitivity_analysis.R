@@ -83,7 +83,7 @@ load(paste0(dirtemp, "sccs_sensitivity/", "sccs_data_extract", ".RData"))
   
   write.csv(table3.split, paste0(diroutput,"sccs_sensitivity/", design, "/table_3.csv"), row.names = FALSE)
   
-# 2.2. ALT 1: SCRI with 90 day post-vaccination period ----------------
+# 2.2. ALT 2: SCRI with 90 day post-vaccination period ----------------
   
   design <- "scri_post"
   dir.create(file.path(paste0(diroutput, "sccs_sensitivity/", design)), showWarnings = FALSE, recursive = TRUE)
@@ -135,7 +135,7 @@ load(paste0(dirtemp, "sccs_sensitivity/", "sccs_data_extract", ".RData"))
   write.csv(table3.split, paste0(diroutput,"sccs_sensitivity/", design, "/table_3.csv"), row.names = FALSE)
   
 
-# 2.3. ALT 2: SCCS ----------------
+# 2.3. ALT 3: SCCS ----------------
   design <- "sccs"
   dir.create(file.path(paste0(diroutput, "sccs_sensitivity/", design)), showWarnings = FALSE, recursive = TRUE)
   
