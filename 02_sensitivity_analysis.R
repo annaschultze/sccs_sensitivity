@@ -73,7 +73,7 @@ load(paste0(dirtemp, "sccs_sensitivity/", "sccs_data_extract", ".RData"))
 
   write.csv(table2, paste0(diroutput,"sccs_sensitivity/", design, "/table_2.csv"), row.names = FALSE)
 
-  # STEP 3. ANALYSIS 
+  # STEP 4. ANALYSIS 
   
   table3.interim  <- lapply(split(scri_pre, scri_pre$type_vax1), sccs_analysis)
   table3.split <- do.call(rbind,table3.interim)
@@ -144,11 +144,12 @@ load(paste0(dirtemp, "sccs_sensitivity/", "sccs_data_extract", ".RData"))
                                outcome = "myopericarditis_date", 
                                reduce_dimensions = "F", 
                                design = "sccs", 
+                               preexp = -30, 
                                risk1 = 28,
                                risk2 = 28)
   
   # STEP 2. PRINT A FLOWCHART
-  table1.interim <- lapply(split(scri_pre, scri_pre$type_vax1), sccs_flowchart)
+  table1.interim <- lapply(split(sccs, sccs$type_vax1), sccs_flowchart)
   table1.split <- do.call(rbind,table1.interim)
   
   # minor tidying of the df before printing out 
@@ -156,7 +157,7 @@ load(paste0(dirtemp, "sccs_sensitivity/", "sccs_data_extract", ".RData"))
   table1.split$Names <- substring(table1.split$Names,1,nchar(table1.split$Names)-2)
   
   # apply to the overall dataset for completion 
-  table1.all <- sccs_flowchart(data = scri_pre)
+  table1.all <- sccs_flowchart(data = sccs)
   
   # export these two flowcharts
   write.csv(table1.split, paste0(diroutput, "sccs_sensitivity/", design, "/table_1a.csv"), row.names = FALSE)
