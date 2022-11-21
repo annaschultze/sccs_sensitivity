@@ -155,6 +155,9 @@ if(any(min(scri_data_extract$dose_diff[!is.na(scri_data_extract$dose_diff)])<14)
 # create a variable for the last possible vaccine date 
 scri_data_extract$days_last_vax <- pmax(scri_data_extract$days_vax1, scri_data_extract$days_vax2, na.rm = T)
 
+# create myopericarditis date variable 
+scri_data_extract$myopericarditis_date <- pmin(scri_data_extract$myocarditis_date, scri_data_extract$pericarditis_date,na.rm=T)
+
 # 3. SAVE DATA ------------------------------------------------------------
 # saving data with new name to prevent overwriting any prior files
 sccs_data_extract <- scri_data_extract 

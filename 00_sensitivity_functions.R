@@ -32,12 +32,12 @@ dir.create(file.path(paste0(diroutput, "sccs_sensitivity")),         showWarning
 #' @description 
 #' Takes clean data for self-controlled designs and does design/outcome specific data management.  
 #' 
-#' @param data = Input dataframe, should be loaded.
-#' @param outcome = Outcome variable name as a string, referencing a _date variable. 
+#' @param data = Input dataframe, should be loaded into R before invoking, as function does not do this. 
+#' @param outcome = Outcome variable name as a string, referencing a date variable. 
 #' @param reduce_dimensions = T drop unnecessary rows to increase speed. Default is "F", option "T" .  
 #' @param design = Type of design - sccs or scri? Default "sccs", option "scri". 
-#' @param control_start = Date used to start the control period (days_vax1 or days_last_vax). Ignored for SCCS. 
-#' @param control_dur = Duration of the control period in days, NEGATIVE for prevaccine, POSITIVE for postvaccine. 
+#' @param control_start = Date used as an anchor to define the control period (days_vax1 or days_last_vax). Ignored for SCCS. 
+#' @param control_dur = Duration of the control period in days, applied to the control_start date. NEGATIVE for prevaccine, POSITIVE for postvaccine. 
 #' @param preexp = Duration of the pre-exposure period, relative to first vaccine date. Default is zero (no pre-exposure period).
 #' @param risk1 = Day the risk period after the first vaccine dose ends, relative to the first vaccine date.
 #' @param risk2 = Day the risk period after the second dose ends, relative to the second vaccine date.
@@ -50,7 +50,7 @@ sccs_data_management <- function(data,
                                  reduce_dimensions = "F", 
                                  design = "scri",
                                  control_start = "days_vax1", 
-                                 control_dur = 60, 
+                                 control_dur = -60, 
                                  preexp = 0, 
                                  risk1, 
                                  risk2) {
@@ -83,23 +83,9 @@ sccs_data_management <- function(data,
   if (!is.character(design)) {
     stop("design input is not character")
   }
-  
-  if (design == "sccs") {
-    if (!is.null(control_start)) {
-      warning("design is sccs, start of control period will be ignored")
-    }
-    if (!is.null(control_dur)) {
-      warning("design is sccs, length of control period will be ignored")
-    }
-  } 
-  
-  if (design == "scri") {
-    if (is.null(control_start)) {
-      stop("design is scri, you need to speficy control_start and control_dur")
-    }
-    if (is.null(control_dur)) {
-      stop("design is scri, you need to speficy control_start and control_dur")
-    }
+    
+  if (control_dur > 0 & preexp != 0) {
+      warning("you've specified a pre-exposure period and a post-vaccine control period, double check")
   }
   
   # INPUT VARIABLES 
@@ -108,22 +94,13 @@ sccs_data_management <- function(data,
   vax1_end          <- risk1
   vax2_end          <- risk2
   
-  # slightly hacky solution to create "first of two dates" input, not very generalisable 
-  if(outcome == "myopericarditis_date"){
-    
-    data$outcome_date <- pmin(data$myocarditis_date,data$pericarditis_date,na.rm=T)
-    data$outcome_days <- round(difftime(data$outcome_date, as.Date("2020-09-01"), units = "days"),0)
-    
-  } else {
-    
-    if (!outcome %in% names(data)) {
+  # create outcome variables 
+  if (!outcome %in% names(data)) {
       stop("outcome column does not exist, check spelling")
     } 
     
-    data$outcome_date <- data[[outcome]]
-    data$outcome_days <- round(difftime(data$outcome_date, as.Date("2020-09-01"), units = "days"),0)
-    
-  }
+  data$outcome_date <- data[[outcome]]
+  data$outcome_days <- round(difftime(data$outcome_date, as.Date("2020-09-01"), units = "days"),0)
   
   # convert to numeric 
   data$outcome_days <- as.numeric(data$outcome_days)
@@ -140,13 +117,14 @@ sccs_data_management <- function(data,
   data$risk_d1_end <- pmin((data$days_vax1 + vax1_end), data$study_exit_days, data$days_vax2, na.rm = T)
   data$risk_d1_length <- (data$risk_d1_end - data$days_vax1)
   
-  # start of between period needs to be dose 1 + risk window + 1 (as last day should go to the risk window)
-  data$risk_between <- data$risk_d1_length + 1 
-  
   # second risk window start, end and duration
   data$risk_d2 <- as.numeric(data$days_vax2 + 1)
   data$risk_d2_end <- pmin((data$days_vax2 + vax2_end), data$study_exit_days, na.rm = T)
   data$risk_d2_length <- (data$risk_d2_end - data$days_vax2)
+  
+  # time between doses, starts at dose one, ends at dose2 risk period 
+  data$between_end <- pmin(data$risk_d2, data$study_exit_days)
+  data$between_length <- (data$between_end - (data$risk_d1_end + 1)) 
 
   ## create a numeric ID variable 
   data$numeric_id <- match(data$person_id, unique(data$person_id))
@@ -161,25 +139,21 @@ sccs_data_management <- function(data,
   }
   
   # DESIGN-SPECIFIC VARIABLES RISK AND CONTROL OPTIONS
-  
   if(design == "sccs") {
     
     # length of study and control period 
-    data$control_length <- (data$study_exit_days - data$risk_d1_length - data$risk_d2_length - abs(preexp_per_start))
+    data$control_length <- (data$study_exit_days - data$risk_d1_length - data$risk_d2_length - abs(preexp_per_start) - data$between_length)
     data$study_length <- data$study_exit_days
     
     # start at the start of study, end at censoring 
     data$ref_start <- as.numeric(data$study_entry_days)
     data$ref_end <- as.numeric(data$study_exit_days)
     
-    # when should the time between doses end?
-    # for sccs, end at the start (if zero, ignored in model estimation) 
-    data$between_end <- data$risk_d1_end + 1 
-    
   } else if(design == "scri") {
     
     # control start and end periods 
-    # for a prevaccine SCRI, start will be control start plus a negative duration, for a post vacc it'll be control start (preexp will be 0 as does not apply in that)
+    # for a prevaccine SCRI, start will be control start plus a negative duration
+    # for a post vacc it'll be control start (preexp will be 0 as does not apply in that)
     data$c_start <- pmin((data[[control_start]] + preexp_per_start), (data[[control_start]] + preexp_per_start + control_duration), na.rm = T)
     data$c_end <- pmax((data[[control_start]] + preexp_per_start), (data[[control_start]] + preexp_per_start + control_duration), na.rm = T)
     data$c_end <- pmin(data$study_exit_days, data$c_end, na.rm = T)
@@ -195,9 +169,6 @@ sccs_data_management <- function(data,
     # end at the last of the end of the control window, first and second risk windows (whichever is first)
     data$ref_end <- pmax(data$c_end, data$risk_d1_end, data$risk_d2_end,  na.rm = T)
     data$ref_end <- as.numeric(data$ref_end)
-    
-    # time between doses should be taken out of the model 
-    data$between_end <- pmin(data$risk_d2, data$study_exit_days)
     
   }
   
@@ -413,8 +384,8 @@ sccs_table <- function(data) {
     # study days starts at zero 
     # double check how this handles missing second doses 
     n_control1 <- sum(as.numeric(data$outcome_days < data$preexp_days), na.rm = T) 
-    n_control2 <- sum(as.numeric((data$riskend_d1 < data$outcome_days) & (data$outcome_days < data$between_dose_end)), na.rm = T) 
-    n_control3 <- sum(as.numeric((data$riskend_d2 < data$outcome_days) & (data$outcome_days <= data$study_exit_days)), na.rm = T) 
+    n_control2 <- sum(as.numeric((data$risk_d1_end < data$outcome_days) & (data$outcome_days < data$between_dose_end)), na.rm = T) 
+    n_control3 <- sum(as.numeric((data$risk_d2_end < data$outcome_days) & (data$outcome_days <= data$study_exit_days)), na.rm = T) 
     
     n_control <- sum(n_control1, n_control2, n_control3)
     
@@ -532,12 +503,11 @@ sccs_analysis <- function(data) {
   max_day = max(data$ref_end, na.rm = T)
   month_cutoffs <- seq(from = -1, to = max_day-1, by = 30)
   
-  ## FIT SCCS OR SCRI 
+  ## FIT SCCS model 
   ### the sccs package does not take strings as input arguments
-  ### the variables going into the exposure variable for sccs vs. scri is different, so unfortunately need separate function calls 
+  ### the variables going into the exposure variable for sccs vs. scri should be the same 
+  ### the ref_start and ref_end defined above will determine which version is fit
   
-  if("sccs" %in% data$study) {
-    
     # UNADJUSTED 
     
     tryCatch({
@@ -549,13 +519,14 @@ sccs_analysis <- function(data) {
         indiv  = numeric_id, 
         astart = ref_start,  
         aend = ref_end, 
-        adrug = cbind((risk_d1 - preexp_dur), risk_d1, risk_d2), 
-        aedrug = cbind(preexp_end, risk_d1_end, risk_d2_end),
+        adrug = cbind((risk_d1 - preexp_dur), risk_d1, (risk_d1_end + 1), risk_d2), 
+        aedrug = cbind(preexp_end, risk_d1_end, between_end, risk_d2_end),
         aevent = outcome_days, 
         dataformat = "multi",
         sameexpopar = F, 
         data = data
       )
+      
       
       message("unadjusted model output")
       print(output.1)
@@ -578,6 +549,8 @@ sccs_analysis <- function(data) {
         if(!exists("output.1")) {
           summary.1 <- data.frame(study_design = design, 
                                   analysis = "unadjusted", 
+                                  N = "n/a", 
+                                  n = "n/a", 
                                   var = "did not fit", 
                                   irr = "-", 
                                   lci = "-", 
@@ -599,8 +572,8 @@ sccs_analysis <- function(data) {
         indiv = numeric_id, 
         astart = ref_start,  
         aend = ref_end, 
-        adrug = cbind((risk_d1 - preexp_dur), risk_d1, risk_d2), 
-        aedrug = cbind(preexp_end, risk_d1_end, risk_d2_end),
+        adrug = cbind((risk_d1 - preexp_dur), risk_d1, (risk_d1_end + 1), risk_d2), 
+        aedrug = cbind(preexp_end, risk_d1_end, between_end, risk_d2_end),
         aevent = outcome_days, 
         agegrp = month_cutoffs, 
         dataformat = "multi",
@@ -629,6 +602,8 @@ sccs_analysis <- function(data) {
       if(!exists("output.2")) {
         summary.2 <- data.frame(study_design = design, 
                                 analysis = "adjusted", 
+                                N = "n/a", 
+                                n = "n/a", 
                                 var = "did not fit", 
                                 irr = "-", 
                                 lci = "-", 
@@ -639,119 +614,13 @@ sccs_analysis <- function(data) {
     
     })
     
-  } else if("scri" %in% data$study) {
-    
-    # UNADJUSTED 
-    
-    tryCatch({
-      
-      message(paste("Fitting unadjusted", design)) 
-      
-      output.1 <- standardsccs(
-        formula = outcome_days ~ risk_d1, 
-        indiv  = numeric_id, 
-        astart = ref_start,  
-        aend = ref_end, 
-        adrug = cbind((risk_d1 - preexp_dur), risk_d1, (risk_d1_end + 1), risk_d2), 
-        aedrug = cbind(preexp_end, risk_d1_end, between_end, risk_d2_end),
-        aevent = outcome_days, 
-        dataformat = "multi",
-        sameexpopar = F, 
-        data = data
-      )
-      
-      message("unadjusted model output")
-      print(output.1)
-      
-    }, 
-    
-    error = function(e) {
-      message("Unadjusted model did not fit, this is the error")
-      print(e)
-    }, 
-    
-    warning = function(w) {
-      message("Unadjusted model did not fit, this is the warning")
-      print(w)
-    },
-    
-    finally = {
-      
-      # check if output exists and create an empty row otherwise 
-      if(!exists("output.1")) {
-        summary.1 <- data.frame(study_design = design, 
-                                analysis = "unadjusted", 
-                                var = "did not fit", 
-                                irr = "-", 
-                                lci = "-", 
-                                uci = "-")
-        
-        message("empty summary output table for unadjusted analyses created")
-      }
-    }
-    ) 
-    
-    # ADJUSTED
-    
-    tryCatch({
-      
-      message(paste("fitting adjusted", design)) 
-      
-      output.2 <- standardsccs(
-        formula = outcome_days ~ risk_d1 + age, 
-        indiv = numeric_id, 
-        astart = ref_start,  
-        aend = ref_end, 
-        adrug = cbind((risk_d1 - preexp_dur), risk_d1, (risk_d1_end + 1), risk_d2), 
-        aedrug = cbind(preexp_end, risk_d1_end, between_end, risk_d2_end),
-        aevent = outcome_days, 
-        agegrp = month_cutoffs, 
-        dataformat = "multi",
-        sameexpopar = F,  
-        data = data
-      )
-      
-      message("adjusted model output")
-      print(output.2)
-      
-    }, 
-    
-    error = function(e) {
-      message("Adjusted model did not fit, this is the error")
-      print(e)
-    }, 
-    
-    warning = function(w) {
-      message("Adjusted model did not fit, this is the warning")
-      print(w)
-    }, 
-    
-    finally = {
-      
-      # check if output exists and create an empty row otherwise 
-      if(!exists("output.2")) {
-        summary.2 <- data.frame(study_design = design, 
-                                analysis = "adjusted", 
-                                var = "did not fit", 
-                                irr = "-", 
-                                lci = "-", 
-                                uci = "-")
-        
-        message("empty summary output table for adjusted analyses created")
-      }
-      
-    })
-    
-    
-  }
-  
   # OUTPUT FORMATTING
   
   # unadjusted output formatting
   
   if(!exists("summary.1")) {
     
-    summary.1 <- as.data.frame(cbind(output.1$conf.int, output.1$coefficients[,c(1,3)]))
+    summary.1 <- as.data.frame(cbind(output.1$n, output.1$nevent, output.1$conf.int, output.1$coefficients[,c(1,3)]))
     summary.1$var <- rownames(summary.1)
     summary.1$analysis <- "unadjusted"
     
@@ -760,9 +629,11 @@ sccs_analysis <- function(data) {
     summary.1 <- summary.1 %>%
       rename(irr = `exp(coef)`,
              lci = `lower .95`,
-             uci = `upper .95`) %>%
+             uci = `upper .95`, 
+             N = `V1`, 
+             n = `V2`) %>%
       mutate(study_design = design) %>% 
-      select(study_design, analysis, var, irr, lci, uci)  
+      select(study_design, analysis, N, n, var, irr, lci, uci)  
     
     message("summary output table for unadjusted analyses created")
     
@@ -772,7 +643,7 @@ sccs_analysis <- function(data) {
   
   if(!exists("summary.2")) {
   
-    summary.2 <- as.data.frame(cbind(output.2$conf.int, output.2$coefficients[,c(1,3)]))
+    summary.2 <- as.data.frame(cbind(output.2$n, output.2$nevent, output.2$conf.int, output.2$coefficients[,c(1,3)]))
     summary.2$var <- rownames(summary.2)
     summary.2$analysis <- "adjusted"
     rownames(summary.2) <- NULL
@@ -780,9 +651,11 @@ sccs_analysis <- function(data) {
     summary.2 <- summary.2 %>%
       rename(irr = `exp(coef)`,
              lci = `lower .95`,
-             uci = `upper .95`) %>%
+             uci = `upper .95`, 
+             N = `V1`, 
+             n = `V2`) %>%
       mutate(study_design = design) %>% 
-      select(study_design, analysis, var, irr, lci, uci) 
+      select(study_design, analysis, N, n, var, irr, lci, uci) 
   
     message("summary output table for adjusted analyses created")
   
@@ -791,25 +664,13 @@ sccs_analysis <- function(data) {
   # bind the two outputs 
   output.total <- rbind(summary.1, summary.2)
     
-  # add design specific labels 
-  if("sccs" %in% data$study) {
-    
-    output.total <- output.total %>%  
-      mutate(var = case_when(var == "risk_d11" ~ "pre-exposure pindow", 
-                             var == "risk_d12" ~ "dose 1 risk window", 
-                             var == "risk_d13" ~ "dose 2 risk window", 
-                             TRUE ~ var)) 
-  
-  } else if("scri" %in% data$study) {
-    
+  # add labels 
     output.total <- output.total %>%  
       mutate(var = case_when(var == "risk_d11" ~ "pre-exposure pindow", 
                          var == "risk_d12" ~ "dose 1 risk window", 
                          var == "risk_d13" ~ "between doses", 
                          var == "risk_d14" ~ "dose 2 risk window", 
                          TRUE ~ var)) 
-  
-  } 
   
   # print an update 
   message("completed sccs_analysis")
